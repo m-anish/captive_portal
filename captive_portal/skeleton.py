@@ -89,6 +89,7 @@ class CaptivePortal(BaseHTTPServer.BaseHTTPRequestHandler):
     use the redirect page
     '''
     def do_GET(self):
+        print("do_GET called!")
         path = self.path
         self.send_response(200)
         self.send_header("Content-type", "text/html")
@@ -101,6 +102,7 @@ class CaptivePortal(BaseHTTPServer.BaseHTTPRequestHandler):
     this is called when the user submits the login form
     '''
     def do_POST(self):
+        print("do_POST called")
         self.send_response(200)
         self.send_header("Content-type", "text/html")
         self.end_headers()
@@ -144,7 +146,8 @@ def setup_initial_iptables(port=PORT, iface=IFACE, ip_address=IP_ADDRESS):
     subprocess.call(["iptables", "-t", "nat", "-A", "PREROUTING", "-i", iface, "-p", "tcp", "--dport", "80", "-j" ,"DNAT", "--to-destination", ip_address+":"+str(port)])
 
 def start_captive_server(port=PORT, iface=IFACE, ip_address=IP_ADDRESS, username=USERNAME, password=PASSWORD):
-    print "Starting web server"
+    setup_initial_iptables()
+    print("Starting web server")
     httpd = BaseHTTPServer.HTTPServer(('', port), CaptivePortal)
     try:
         httpd.serve_forever()
@@ -167,11 +170,11 @@ def parse_args(args):
         '--version',
         action='version',
         version='captive_portal {ver}'.format(ver=__version__))
-    parser.add_argument(
-        dest="n",
-        help="n-th Fibonacci number",
-        type=int,
-        metavar="INT")
+    #parser.add_argument(
+    #    dest="n",
+    #    help="n-th Fibonacci number",
+    #    type=int,
+    #    metavar="INT")
     parser.add_argument(
         '-v',
         '--verbose',
@@ -209,8 +212,33 @@ def main(args):
     args = parse_args(args)
     setup_logging(args.loglevel)
     _logger.debug("Starting crazy calculations...")
-    setup_initial_iptables()
-    start_captive_server()
+    #start_captive_server()
+
+    print("*********************************************")
+    print("* Note, if there are already iptables rules *")
+    print("* this script may not work. Flush iptables  *")
+    print("* at your own riks using iptables -F        *")
+    print("*********************************************")
+    print("Updating iptables")
+    print(".. Allow TCP DNS")
+    subprocess.call(["iptables", "-A", "FORWARD", "-i", IFACE, "-p", "tcp", "--dport", "53", "-j" ,"ACCEPT"])
+    print(".. Allow UDP DNS")
+    subprocess.call(["iptables", "-A", "FORWARD", "-i", IFACE, "-p", "udp", "--dport", "53", "-j" ,"ACCEPT"])
+    print(".. Allow traffic to captive portal")
+    subprocess.call(["iptables", "-A", "FORWARD", "-i", IFACE, "-p", "tcp", "--dport", str(PORT),"-d", IP_ADDRESS, "-j" ,"ACCEPT"])
+    print(".. Block all other traffic")
+    subprocess.call(["iptables", "-A", "FORWARD", "-i", IFACE, "-j" ,"DROP"])
+    print("Starting web server")
+    httpd = BaseHTTPServer.HTTPServer(('', PORT), CaptivePortal)
+    print("Redirecting HTTP traffic to captive portal")
+    subprocess.call(["iptables", "-t", "nat", "-A", "PREROUTING", "-i", IFACE, "-p", "tcp", "--dport", "80", "-j" ,"DNAT", "--to-destination", IP_ADDRESS+":"+str(PORT)])
+    try:
+        httpd.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    httpd.server_close()
+
+
     #print("The {}-th Fibonacci number is {}".format(args.n, fib(args.n)))
     _logger.info("Script ends here")
 

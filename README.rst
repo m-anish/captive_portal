@@ -3,17 +3,10 @@ captive_portal
 ==============
 
 
-Add a short description here!
+A python and iptables based captive portal inspired by https://github.com/nikosft/captive-portal
 
 
 Description
 ===========
 
-A longer description of your project goes here...
-
-
-Note
-====
-
-This project has been set up using PyScaffold 3.0.3. For details and usage
-information on PyScaffold see http://pyscaffold.org/.
+TODO: Add a detailed description here
